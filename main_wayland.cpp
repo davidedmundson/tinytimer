@@ -5,12 +5,14 @@
 #include <KWayland/Server/shell_interface.h>
 #include <KWayland/Server/seat_interface.h>
 
-#include <KToolInvocation>
-
 #include <QCoreApplication>
 #include <QTest>
 #include <QProcess>
 
+#include <QDBusConnection>
+#include <QDBusMessage>
+
+#define PROCESS_NAME "dolphin"
 
 class DaveTest : public QObject
 {
@@ -19,10 +21,9 @@ public:
     DaveTest();
 private slots:
     void testQProcess();
-    void testKRun();
+    void testKInit();
 private:
     void initServer();
-    void waitForWindow();
     KWayland::Server::ShellInterface *m_shell = nullptr;
     KWayland::Server::Display *m_display = nullptr;
 };
@@ -34,36 +35,38 @@ DaveTest::DaveTest()
 void DaveTest::testQProcess()
 {
     initServer();
-    QBENCHMARK {
-        QProcess::startDetached("dolphin");
-        waitForWindow();
-    }
-    //will crash dolphin which is fine
-    delete m_display;
-    QTest::qSleep(1000);
-}
-
-void DaveTest::testKRun()
-{
-    initServer();
-    QBENCHMARK {
-        int pid;
-        KToolInvocation::startServiceByDesktopName("dolphin", QString(), 0, 0, &pid, QByteArray(), true);
-        waitForWindow();
-    }
-    //will crash dolphin which is fine
-    delete m_display;
-    QTest::qSleep(1000);
-}
-
-
-
-void DaveTest::waitForWindow()
-{
     QEventLoop e;
     connect(m_shell, &KWayland::Server::ShellInterface::surfaceCreated,
             &e, &QEventLoop::quit);
-    e.exec();
+
+    QProcess::startDetached(PROCESS_NAME, {"--platform", "wayland"});
+    QBENCHMARK {
+        e.exec();
+    }
+    //will crash dolphin which is fine
+    delete m_display;
+    QTest::qSleep(1000);
+}
+
+void DaveTest::testKInit()
+{
+    initServer();
+    QEventLoop e;
+    connect(m_shell, &KWayland::Server::ShellInterface::surfaceCreated,
+            &e, &QEventLoop::quit);
+
+    auto msg = QDBusMessage::createMethodCall("org.kde.klauncher5", "/KLauncher", "org.kde.KLauncher", "kdeinit_exec");
+    msg << PROCESS_NAME;
+    msg << QStringList({"--platform", "wayland"});
+    msg << QStringList();
+    msg << QString();
+    QDBusConnection::sessionBus().call(msg, QDBus::NoBlock);
+    QBENCHMARK {
+        e.exec();
+    }
+    //will crash dolphin which is fine
+    delete m_display;
+    QTest::qSleep(1000);
 }
 
 void DaveTest::initServer()
@@ -71,13 +74,13 @@ void DaveTest::initServer()
     qDebug() << "init server";
     using namespace KWayland::Server;
     m_display = new Display;
-    m_display->setSocketName(QStringLiteral("asf"));
+    m_display->setSocketName(QStringLiteral("wayland-0"));
     m_display->start();
     DataDeviceManagerInterface *ddm = m_display->createDataDeviceManager();
     ddm->create();
     CompositorInterface *compositor = m_display->createCompositor(m_display);
     compositor->create();
-    m_shell = m_display->createShell();
+    m_shell = m_display->createShell(m_display);
     m_shell->create();
     m_display->createShm();
     OutputInterface *output = m_display->createOutput(m_display);
@@ -94,4 +97,4 @@ void DaveTest::initServer()
 
 QTEST_GUILESS_MAIN(DaveTest);
 
-#include "main.moc"
+#include "main_wayland.moc"

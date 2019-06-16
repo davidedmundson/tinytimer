@@ -61,4 +61,4 @@ void DaveTest::initServer()
 
 QTEST_GUILESS_MAIN(DaveTest);
 
-#include "main.moc"
+#include "main_x11.moc"

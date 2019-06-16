@@ -19,19 +19,21 @@ include(CheckIncludeFiles)
 
 find_package(Qt5 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS
 Core
+DBus
 Test
 )
 
 set(KF5_MIN_VERSION "5.2.0")
 find_package(KF5 ${KF5_MIN_VERSION} REQUIRED COMPONENTS
     WindowSystem
+    Wayland
     Service
 )
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-set(FOO_SOURCES main.cpp)
+set(FOO_SOURCES main_wayland.cpp)
 add_executable(kinittest ${FOO_SOURCES})
-target_link_libraries(kinittest Qt5::Test KF5::WindowSystem KF5::Service)
+target_link_libraries(kinittest Qt5::Test Qt5::DBus KF5::WindowSystem KF5::Service KF5::WaylandServer)
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
